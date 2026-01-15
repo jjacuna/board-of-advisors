@@ -33,3 +33,13 @@ CREATE TABLE IF NOT EXISTS advisor_settings (
     system_prompt TEXT NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS documents (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    chunk_count INTEGER DEFAULT 0,
+    status TEXT DEFAULT 'processing',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

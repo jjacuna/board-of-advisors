@@ -122,10 +122,12 @@
                 <button onclick="selectTab('cto')" id="tab-cto" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">CTO</button>
                 <button onclick="selectTab('cmo')" id="tab-cmo" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">CMO</button>
                 <button onclick="selectTab('ceo')" id="tab-ceo" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">CEO</button>
+                <button onclick="selectTab('knowledge')" id="tab-knowledge" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">Knowledge Base</button>
             </div>
 
             <!-- Tab Content -->
             <div class="flex-1 overflow-y-auto p-6">
+                <!-- Advisor Settings Form -->
                 <div id="settingsForm" class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -143,6 +145,49 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
                         <textarea id="setting-prompt" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 font-mono text-sm"></textarea>
+                    </div>
+                </div>
+
+                <!-- Knowledge Base Section -->
+                <div id="knowledgeSection" class="hidden space-y-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-2">Upload Documents</h3>
+                        <p class="text-sm text-gray-500 mb-4">Upload PDF, TXT, MD, or DOCX files to build your knowledge base. The board will use this context when answering questions.</p>
+
+                        <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-gray-400 transition-colors">
+                            <input type="file" id="fileInput" accept=".pdf,.txt,.md,.docx" class="hidden" onchange="uploadFile(this)">
+                            <svg class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                            </svg>
+                            <p class="text-gray-600 mb-2">Drop files here or click to browse</p>
+                            <button onclick="document.getElementById('fileInput').click()" class="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">
+                                Select File
+                            </button>
+                            <p class="text-xs text-gray-400 mt-2">Max 10MB per file</p>
+                        </div>
+
+                        <div id="uploadProgress" class="hidden mt-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="animate-spin rounded-full h-5 w-5 border-2 border-gray-300 border-t-gray-800"></div>
+                                <span class="text-sm text-gray-600">Processing document...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-800 mb-4">Uploaded Documents</h3>
+                        <div id="documentsList" class="space-y-2">
+                            <p class="text-gray-400 text-sm">No documents uploaded yet</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 class="font-medium text-blue-800 mb-1">Setup Required</h4>
+                        <p class="text-sm text-blue-600">To enable the knowledge base, add these environment variables:</p>
+                        <ul class="text-sm text-blue-600 mt-2 space-y-1">
+                            <li><code class="bg-blue-100 px-1 rounded">OPENAI_API_KEY</code> - For text embeddings</li>
+                            <li><code class="bg-blue-100 px-1 rounded">PINECONE_API_KEY</code> - For vector storage (free tier available)</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -310,8 +355,8 @@
 
         function selectTab(tab) {
             currentTab = tab;
-            const tabs = ['cfo', 'cto', 'cmo', 'ceo'];
-            const colors = { cfo: 'emerald', cto: 'blue', cmo: 'violet', ceo: 'amber' };
+            const tabs = ['cfo', 'cto', 'cmo', 'ceo', 'knowledge'];
+            const colors = { cfo: 'emerald', cto: 'blue', cmo: 'violet', ceo: 'amber', knowledge: 'indigo' };
 
             tabs.forEach(t => {
                 const el = document.getElementById(`tab-${t}`);
@@ -322,11 +367,122 @@
                 }
             });
 
-            const data = settingsData[tab] || {};
-            document.getElementById('setting-name').value = data.name || '';
-            document.getElementById('setting-role').value = data.role || '';
-            document.getElementById('setting-model').value = data.model || '';
-            document.getElementById('setting-prompt').value = data.system_prompt || '';
+            // Toggle between advisor form and knowledge base section
+            const settingsForm = document.getElementById('settingsForm');
+            const knowledgeSection = document.getElementById('knowledgeSection');
+
+            if (tab === 'knowledge') {
+                settingsForm.classList.add('hidden');
+                knowledgeSection.classList.remove('hidden');
+                loadDocuments();
+            } else {
+                settingsForm.classList.remove('hidden');
+                knowledgeSection.classList.add('hidden');
+
+                const data = settingsData[tab] || {};
+                document.getElementById('setting-name').value = data.name || '';
+                document.getElementById('setting-role').value = data.role || '';
+                document.getElementById('setting-model').value = data.model || '';
+                document.getElementById('setting-prompt').value = data.system_prompt || '';
+            }
+        }
+
+        async function loadDocuments() {
+            try {
+                const response = await fetch('/documents');
+                const documents = await response.json();
+                renderDocumentsList(documents);
+            } catch (error) {
+                console.error('Failed to load documents:', error);
+            }
+        }
+
+        function renderDocumentsList(documents) {
+            const list = document.getElementById('documentsList');
+
+            if (!documents || documents.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-sm">No documents uploaded yet</p>';
+                return;
+            }
+
+            list.innerHTML = documents.map(doc => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+                            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800">${doc.filename}</p>
+                            <p class="text-xs text-gray-500">${formatFileSize(doc.file_size)} • ${doc.chunk_count || 0} chunks • ${doc.status}</p>
+                        </div>
+                    </div>
+                    <button onclick="deleteDocument(${doc.id})" class="p-2 text-gray-400 hover:text-red-500 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        async function uploadFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const progress = document.getElementById('uploadProgress');
+            progress.classList.remove('hidden');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/documents/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(`Document uploaded successfully! ${result.chunk_count} chunks created.`);
+                    loadDocuments();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Upload failed: ' + error.message);
+            } finally {
+                progress.classList.add('hidden');
+                input.value = '';
+            }
+        }
+
+        async function deleteDocument(docId) {
+            if (!confirm('Are you sure you want to delete this document?')) return;
+
+            try {
+                const response = await fetch(`/documents/${docId}`, {
+                    method: 'DELETE'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    loadDocuments();
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Delete failed: ' + error.message);
+            }
         }
 
         async function saveCurrentSettings() {

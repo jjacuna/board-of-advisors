@@ -138,3 +138,71 @@ def save_advisor_setting(advisor_key: str, name: str, role: str, model: str, sys
 
     conn.commit()
     conn.close()
+
+
+def save_document(filename: str, file_type: str, file_size: int) -> int:
+    """Save document metadata and return document ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """INSERT INTO documents (filename, file_type, file_size, status)
+           VALUES (?, ?, ?, 'processing')""",
+        (filename, file_type, file_size)
+    )
+    doc_id = cursor.lastrowid
+
+    conn.commit()
+    conn.close()
+
+    return doc_id
+
+
+def update_document_status(doc_id: int, status: str, chunk_count: int = None):
+    """Update document processing status."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    if chunk_count is not None:
+        cursor.execute(
+            "UPDATE documents SET status = ?, chunk_count = ? WHERE id = ?",
+            (status, chunk_count, doc_id)
+        )
+    else:
+        cursor.execute(
+            "UPDATE documents SET status = ? WHERE id = ?",
+            (status, doc_id)
+        )
+
+    conn.commit()
+    conn.close()
+
+
+def get_documents() -> list:
+    """Get all documents with metadata."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """SELECT id, filename, file_type, file_size, chunk_count, status, created_at
+           FROM documents
+           ORDER BY created_at DESC"""
+    )
+    documents = [dict(row) for row in cursor.fetchall()]
+
+    conn.close()
+    return documents
+
+
+def delete_document(doc_id: int) -> bool:
+    """Delete document metadata from database."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    deleted = cursor.rowcount > 0
+
+    conn.commit()
+    conn.close()
+
+    return deleted

@@ -106,7 +106,7 @@ def get_all_advisor_configs():
     return configs
 
 
-def get_advisor_response(advisor: dict, question: str) -> str:
+def get_advisor_response(advisor: dict, question: str, context: str = "") -> str:
     """Get response from a single advisor via OpenRouter."""
     if not OPENROUTER_API_KEY:
         raise ValueError("OPENROUTER_API_KEY environment variable is not set")
@@ -118,11 +118,16 @@ def get_advisor_response(advisor: dict, question: str) -> str:
         "X-Title": "Board of Directors AI"
     }
 
+    # Include knowledge base context if available
+    user_message = question
+    if context:
+        user_message = f"{context}\n\nQUESTION:\n{question}"
+
     payload = {
         "model": advisor["model"],
         "messages": [
             {"role": "system", "content": advisor["system_prompt"]},
-            {"role": "user", "content": question}
+            {"role": "user", "content": user_message}
         ],
         "max_tokens": 500
     }
@@ -142,7 +147,7 @@ def get_advisor_response(advisor: dict, question: str) -> str:
     return data["choices"][0]["message"]["content"]
 
 
-def get_ceo_decision(advisor_responses: list, original_question: str) -> str:
+def get_ceo_decision(advisor_responses: list, original_question: str, context: str = "") -> str:
     """CEO synthesizes all advisor input and makes final decision."""
     ceo = get_ceo()
 
@@ -159,4 +164,4 @@ Here are the responses from your advisors:
 
 Based on all this input, provide your executive decision."""
 
-    return get_advisor_response(ceo, ceo_prompt)
+    return get_advisor_response(ceo, ceo_prompt, context)
