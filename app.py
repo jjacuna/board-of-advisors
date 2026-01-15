@@ -21,30 +21,33 @@ def ask_board():
     if not question:
         return jsonify({"error": "No question provided"}), 400
 
-    # Get responses from all advisors (now loads from DB with fallback)
-    advisors = get_advisors()
-    advisor_responses = []
-    for advisor in advisors:
-        response = get_advisor_response(advisor, question)
-        advisor_responses.append({
-            "name": advisor["name"],
-            "role": advisor["role"],
-            "model": advisor["model"],
-            "response": response
+    try:
+        # Get responses from all advisors (now loads from DB with fallback)
+        advisors = get_advisors()
+        advisor_responses = []
+        for advisor in advisors:
+            response = get_advisor_response(advisor, question)
+            advisor_responses.append({
+                "name": advisor["name"],
+                "role": advisor["role"],
+                "model": advisor["model"],
+                "response": response
+            })
+
+        # Get CEO's final decision
+        ceo_decision = get_ceo_decision(advisor_responses, question)
+
+        # Save to database
+        conversation_id = save_conversation(question, advisor_responses, ceo_decision)
+
+        return jsonify({
+            "conversation_id": conversation_id,
+            "question": question,
+            "advisors": advisor_responses,
+            "ceo_decision": ceo_decision
         })
-
-    # Get CEO's final decision
-    ceo_decision = get_ceo_decision(advisor_responses, question)
-
-    # Save to database
-    conversation_id = save_conversation(question, advisor_responses, ceo_decision)
-
-    return jsonify({
-        "conversation_id": conversation_id,
-        "question": question,
-        "advisors": advisor_responses,
-        "ceo_decision": ceo_decision
-    })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/history")

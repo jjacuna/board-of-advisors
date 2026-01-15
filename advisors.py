@@ -108,10 +108,13 @@ def get_all_advisor_configs():
 
 def get_advisor_response(advisor: dict, question: str) -> str:
     """Get response from a single advisor via OpenRouter."""
+    if not OPENROUTER_API_KEY:
+        raise ValueError("OPENROUTER_API_KEY environment variable is not set")
+
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
         "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:5000",
+        "HTTP-Referer": "https://board-of-advisors.up.railway.app",
         "X-Title": "Board of Directors AI"
     }
 
@@ -125,9 +128,18 @@ def get_advisor_response(advisor: dict, question: str) -> str:
     }
 
     response = requests.post(OPENROUTER_URL, headers=headers, json=payload)
-    response.raise_for_status()
 
-    return response.json()["choices"][0]["message"]["content"]
+    # Check for errors before parsing JSON
+    if response.status_code != 200:
+        try:
+            error_data = response.json()
+            error_msg = error_data.get("error", {}).get("message", response.text)
+        except:
+            error_msg = response.text[:500]
+        raise ValueError(f"OpenRouter API error ({response.status_code}): {error_msg}")
+
+    data = response.json()
+    return data["choices"][0]["message"]["content"]
 
 
 def get_ceo_decision(advisor_responses: list, original_question: str) -> str:
