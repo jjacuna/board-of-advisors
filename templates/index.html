@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Board of Directors AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .scrollbar-thin::-webkit-scrollbar { width: 4px; }
+        .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+        .scrollbar-thin::-webkit-scrollbar-thumb { background: #e5e7eb; border-radius: 2px; }
+    </style>
+</head>
+<body class="bg-white min-h-screen">
+    <div class="flex h-screen">
+        <!-- Left Sidebar -->
+        <aside class="w-64 border-r border-gray-200 flex flex-col bg-gray-50">
+            <!-- Logo -->
+            <div class="p-4 border-b border-gray-200">
+                <div class="flex items-center space-x-2">
+                    <div class="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center">
+                        <span class="text-white text-sm font-bold">B</span>
+                    </div>
+                    <span class="font-semibold text-gray-800">Board of Directors</span>
+                </div>
+            </div>
+
+            <!-- New Chat Button -->
+            <div class="p-3">
+                <button onclick="newChat()" class="w-full flex items-center space-x-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    <span class="text-sm font-medium">New</span>
+                </button>
+            </div>
+
+            <!-- History List -->
+            <div class="flex-1 overflow-y-auto scrollbar-thin px-3 pb-3">
+                <p class="text-xs text-gray-400 uppercase tracking-wider px-3 mb-2">History</p>
+                <div id="historyList" class="space-y-1">
+                    {% if history %}
+                        {% for conv in history %}
+                        <div class="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors truncate"
+                             onclick="showHistory({{ conv.id }})">
+                            {{ conv.question }}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-gray-400 text-sm px-3">No previous questions</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Settings Button -->
+            <div class="p-3 border-t border-gray-200">
+                <button onclick="openSettings()" class="w-full flex items-center space-x-2 px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">Settings</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col">
+            <header class="border-b border-gray-200 px-6 py-4">
+                <h1 class="text-lg font-semibold text-gray-800">Board of Directors AI</h1>
+            </header>
+
+            <div class="flex-1 overflow-y-auto scrollbar-thin" id="chatArea">
+                <div id="welcomeState" class="h-full flex flex-col items-center justify-center px-6">
+                    <h2 class="text-2xl font-semibold text-gray-800 mb-2">Hi there, what can I help with?</h2>
+                    <p class="text-gray-500 mb-8">Ask your board a strategic question</p>
+                </div>
+
+                <div id="loading" class="hidden h-full flex flex-col items-center justify-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-800"></div>
+                    <p class="text-gray-600 mt-4">Consulting the board...</p>
+                </div>
+
+                <div id="results" class="hidden max-w-3xl mx-auto px-6 py-8 space-y-6"></div>
+            </div>
+
+            <div class="border-t border-gray-200 p-4">
+                <div class="max-w-3xl mx-auto">
+                    <div class="relative bg-gray-50 rounded-2xl border border-gray-200 focus-within:border-gray-400 transition-colors">
+                        <textarea id="question" rows="1"
+                            class="w-full px-4 py-3 pr-12 bg-transparent resize-none focus:outline-none text-gray-800 placeholder-gray-400"
+                            placeholder="Ask anything, create anything"
+                            oninput="autoResize(this)"></textarea>
+                        <button onclick="askBoard()" id="submitBtn"
+                            class="absolute right-2 bottom-2 p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+                <h2 class="text-xl font-semibold text-gray-800">Advisor Settings</h2>
+                <button onclick="closeSettings()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-200 px-6">
+                <button onclick="selectTab('cfo')" id="tab-cfo" class="px-4 py-3 text-sm font-medium border-b-2 border-emerald-500 text-emerald-600">CFO</button>
+                <button onclick="selectTab('cto')" id="tab-cto" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">CTO</button>
+                <button onclick="selectTab('cmo')" id="tab-cmo" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">CMO</button>
+                <button onclick="selectTab('ceo')" id="tab-ceo" class="px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700">CEO</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="flex-1 overflow-y-auto p-6">
+                <div id="settingsForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                        <input type="text" id="setting-name" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <input type="text" id="setting-role" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                        <input type="text" id="setting-model" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900" placeholder="e.g., openai/gpt-4o-mini">
+                        <p class="text-xs text-gray-400 mt-1">OpenRouter model ID (e.g., google/gemini-2.0-flash-001, anthropic/claude-3.5-haiku)</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">System Prompt</label>
+                        <textarea id="setting-prompt" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 font-mono text-sm"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex justify-end space-x-3 px-6 py-4 border-t border-gray-200">
+                <button onclick="closeSettings()" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                <button onclick="saveCurrentSettings()" class="px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const historyData = {{ history | tojson | safe }};
+        let settingsData = {};
+        let currentTab = 'cfo';
+
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+        }
+
+        function newChat() {
+            document.getElementById('question').value = '';
+            document.getElementById('welcomeState').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function askBoard() {
+            const question = document.getElementById('question').value.trim();
+            if (!question) return;
+
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const welcomeState = document.getElementById('welcomeState');
+            const submitBtn = document.getElementById('submitBtn');
+
+            welcomeState.classList.add('hidden');
+            loading.classList.remove('hidden');
+            results.classList.add('hidden');
+            results.innerHTML = '';
+            submitBtn.disabled = true;
+
+            try {
+                const response = await fetch('/ask', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({question})
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    renderResults(data);
+                    document.getElementById('question').value = '';
+                    document.getElementById('question').style.height = 'auto';
+                    refreshHistory();
+                } else {
+                    results.innerHTML = `<div class="text-red-600 p-4 bg-red-50 rounded-lg">Error: ${data.error || 'Something went wrong'}</div>`;
+                    results.classList.remove('hidden');
+                }
+            } catch (error) {
+                results.innerHTML = `<div class="text-red-600 p-4 bg-red-50 rounded-lg">Error: ${error.message}</div>`;
+                results.classList.remove('hidden');
+            } finally {
+                loading.classList.add('hidden');
+                submitBtn.disabled = false;
+            }
+        }
+
+        function renderResults(data) {
+            const results = document.getElementById('results');
+            let html = '';
+
+            for (const advisor of data.advisors) {
+                html += `
+                    <div class="bg-white border border-gray-200 rounded-xl p-5">
+                        <div class="flex items-center space-x-3 mb-3">
+                            <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
+                                <span class="text-gray-600 font-semibold text-sm">${advisor.name.charAt(0)}</span>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-gray-800">${advisor.name}</h3>
+                                <p class="text-xs text-gray-500">${advisor.role}</p>
+                            </div>
+                        </div>
+                        <p class="text-gray-700 leading-relaxed whitespace-pre-wrap">${advisor.response}</p>
+                        <p class="text-xs text-gray-400 mt-3">${advisor.model}</p>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="bg-amber-50 border-2 border-amber-200 rounded-xl p-6">
+                    <div class="flex items-center space-x-3 mb-4">
+                        <div class="w-12 h-12 rounded-full bg-amber-200 flex items-center justify-center">
+                            <span class="text-amber-700 text-xl">&#x1F454;</span>
+                        </div>
+                        <div>
+                            <h3 class="font-bold text-lg text-gray-800">CEO - Executive Decision</h3>
+                        </div>
+                    </div>
+                    <div class="text-gray-700 leading-relaxed whitespace-pre-wrap">${data.ceo_decision}</div>
+                </div>
+            `;
+
+            results.innerHTML = html;
+            results.classList.remove('hidden');
+        }
+
+        async function refreshHistory() {
+            try {
+                const response = await fetch('/history');
+                const history = await response.json();
+                const historyList = document.getElementById('historyList');
+
+                if (history.length > 0) {
+                    historyList.innerHTML = history.map(conv => `
+                        <div class="px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors truncate"
+                             onclick='showHistoryItem(${JSON.stringify(conv).replace(/'/g, "\\'")})'>
+                            ${conv.question}
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Failed to refresh history:', error);
+            }
+        }
+
+        function showHistory(id) {
+            const conv = historyData.find(c => c.id === id);
+            if (conv) showHistoryItem(conv);
+        }
+
+        function showHistoryItem(conv) {
+            document.getElementById('welcomeState').classList.add('hidden');
+            const data = {
+                advisors: conv.advisors.map(a => ({
+                    name: a.advisor_name,
+                    role: a.advisor_role,
+                    model: a.model_used,
+                    response: a.response
+                })),
+                ceo_decision: conv.ceo_decision ? conv.ceo_decision.decision : 'No decision recorded'
+            };
+            renderResults(data);
+        }
+
+        // Settings functions
+        async function openSettings() {
+            document.getElementById('settingsModal').classList.remove('hidden');
+            try {
+                const response = await fetch('/settings');
+                settingsData = await response.json();
+                selectTab('cfo');
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        function selectTab(tab) {
+            currentTab = tab;
+            const tabs = ['cfo', 'cto', 'cmo', 'ceo'];
+            const colors = { cfo: 'emerald', cto: 'blue', cmo: 'violet', ceo: 'amber' };
+
+            tabs.forEach(t => {
+                const el = document.getElementById(`tab-${t}`);
+                if (t === tab) {
+                    el.className = `px-4 py-3 text-sm font-medium border-b-2 border-${colors[t]}-500 text-${colors[t]}-600`;
+                } else {
+                    el.className = 'px-4 py-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700';
+                }
+            });
+
+            const data = settingsData[tab] || {};
+            document.getElementById('setting-name').value = data.name || '';
+            document.getElementById('setting-role').value = data.role || '';
+            document.getElementById('setting-model').value = data.model || '';
+            document.getElementById('setting-prompt').value = data.system_prompt || '';
+        }
+
+        async function saveCurrentSettings() {
+            const data = {
+                name: document.getElementById('setting-name').value,
+                role: document.getElementById('setting-role').value,
+                model: document.getElementById('setting-model').value,
+                system_prompt: document.getElementById('setting-prompt').value
+            };
+
+            try {
+                const response = await fetch(`/settings/${currentTab}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    settingsData[currentTab] = {...settingsData[currentTab], ...data};
+                    alert('Settings saved successfully!');
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                alert('Failed to save settings: ' + error.message);
+            }
+        }
+
+        document.getElementById('question').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                askBoard();
+            }
+        });
+
+        // Close modal on escape
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeSettings();
+        });
+    </script>
+</body>
+</html>
